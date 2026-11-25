@@ -44,6 +44,30 @@ flux resume image update --all -n flux-system    # after the fix is built
 
 **Logs:** `kubectl logs -n atmos deploy/backend` (add `--previous` after a restart). There is no central log storage.
 
+## Monitoring (before Flux)
+
+Installed by hand with Helm from the values in `monitoring/`; versions pinned here:
+
+| Release | Chart | Version |
+|---|---|---|
+| `prometheus` (with kube-state-metrics) | `prometheus-community/prometheus` | 30.0.1 (Prometheus v3.16.0) |
+| `grafana` | `grafana-community/grafana` | 14.6.0 (Grafana 13.3.2) |
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana-community https://grafana-community.github.io/helm-charts
+helm upgrade --install prometheus prometheus-community/prometheus --version 30.0.1 -n monitoring --create-namespace -f monitoring/prometheus-values.yaml
+helm upgrade --install grafana grafana-community/grafana --version 14.6.0 -n monitoring -f monitoring/grafana-values.yaml
+```
+
+- Prometheus keeps 3 days on a 5Gi volume on `k8s-w1` and scrapes node-exporter on all four servers (job `node-exporter`, label `server`).
+- Grafana has no volume: the data source and the dashboards (folder Atmos: servers, cluster, nodes, pods) are provisioned from the values.
+- Grafana admin password: Secret `grafana-admin` (keys `admin-user`, `admin-password`), created before the install:
+
+```bash
+kubectl create secret generic grafana-admin -n monitoring --from-literal=admin-user=admin --from-literal=admin-password=(openssl rand -base64 24)
+```
+
 ## Secrets
 
 Not stored in Git. Created by hand with `kubectl create secret`: OpenWeather key, MongoDB password, Grafana admin password, Nexus pull credentials and CA for Flux.
