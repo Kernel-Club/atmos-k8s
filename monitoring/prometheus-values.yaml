@@ -1,0 +1,58 @@
+# Values of the prometheus-community/prometheus chart (version pinned in the README).
+# Prometheus with kube-state-metrics; node-exporter runs on the servers (atmos-ansible), Alertmanager comes later.
+
+server:
+  retention: 3d
+  # Data on the disk of one node (local-path), so the pod is pinned to that node.
+  nodeSelector:
+    kubernetes.io/hostname: k8s-w1
+  persistentVolume:
+    size: 5Gi
+  # Memory request = limit (RAM table in docs/on-premise/architecture.md); CPU request only.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 600Mi
+    limits:
+      memory: 600Mi
+
+configmapReload:
+  prometheus:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 20Mi
+      limits:
+        memory: 20Mi
+
+kube-state-metrics:
+  enabled: true
+  # Planned in the RAM of k8s-w1; k8s-cp keeps its memory for Flux.
+  nodeSelector:
+    kubernetes.io/hostname: k8s-w1
+  resources:
+    requests:
+      cpu: 20m
+      memory: 100Mi
+    limits:
+      memory: 100Mi
+
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+
+# node-exporter on the four servers (installed by atmos-ansible, port 9100 open for the cluster nodes).
+extraScrapeConfigs: |
+  - job_name: node-exporter
+    static_configs:
+      - targets: ["192.168.0.51:9100"]
+        labels: {server: k8s-cp}
+      - targets: ["192.168.0.52:9100"]
+        labels: {server: k8s-w1}
+      - targets: ["192.168.0.53:9100"]
+        labels: {server: nexus-traefik}
+      - targets: ["192.168.0.54:9100"]
+        labels: {server: jenkins}
