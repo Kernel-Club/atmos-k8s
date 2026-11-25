@@ -1,0 +1,6 @@
+apiVersion: v2
+name: atmos
+description: Atmos weather application on the on-premise k3s cluster
+type: application
+version: 0.1.0
+# No appVersion: the image tags are set in values.yaml (by Flux), so a fixed appVersion here would go stale.

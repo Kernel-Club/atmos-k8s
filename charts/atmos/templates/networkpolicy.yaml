@@ -1,0 +1,22 @@
+# MongoDB and Redis accept connections only from the backend (k3s enforces NetworkPolicy).
+{{- range $name, $port := dict "mongodb" 27017 "redis" 6379 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/part-of: atmos
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
+      ports:
+        - port: {{ $port }}
+{{- end }}

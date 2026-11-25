@@ -25,8 +25,8 @@ Nexus (nexus-traefik) ─► Flux: new tag ─► commit to main ─► Helm upg
 
 ## Delivery
 
-1. Jenkins pushes a new image to Nexus (`<build>-<short-sha>`).
-2. Flux selects the highest build number and commits the tag to `spec.values` of the HelmRelease in `main`.
+1. Jenkins pushes a new image to Nexus (`<MAJOR.MINOR>.<commits>-<short-sha>`, for example `1.0.82-8d3c3cb`).
+2. Flux selects the highest version and commits the tag to `spec.values` of the HelmRelease in `main`.
 3. Flux upgrades the Helm release and the pods are replaced.
 
 ```bash
@@ -46,7 +46,24 @@ flux resume image update --all -n flux-system    # after the fix is built
 
 ## Secrets
 
-Not stored in Git. Created by hand with `kubectl create secret`: OpenWeather key, MongoDB password, Grafana admin password, Nexus pull credentials and CA for Flux. Flux uses a deploy key with write access to this repository only.
+Not stored in Git. Created by hand with `kubectl create secret`: OpenWeather key, MongoDB password, Grafana admin password, Nexus pull credentials and CA for Flux.
+
+The application reads the Secret `atmos-secrets` (keys `openweather-api-key`, `mongodb-password`). Create it once, before the first install (fish; the key is typed hidden, the password is generated):
+
+```bash
+read -s -P "OpenWeather API key: " key
+kubectl create secret generic atmos-secrets -n atmos --from-literal=openweather-api-key=$key --from-literal=mongodb-password=(openssl rand -hex 24)
+set -e key
+```
+
+The MongoDB password is set only when the volume is created: changing it in the Secret later does not change it in MongoDB.
+
+## Manual install (before Flux)
+
+```bash
+helm lint charts/atmos
+helm upgrade --install atmos charts/atmos -n atmos --create-namespace
+```
 
 ## Related
 

@@ -1,0 +1,56 @@
+# Default values of the Atmos chart. Image tags are updated by Flux.
+
+frontend:
+  image:
+    repository: nexus.atmos.lan:5000/atmos-frontend
+    tag: 1.0.82-8d3c3cb
+  port: 5173
+  # Memory request = limit (RAM table in docs/on-premise/architecture.md); CPU request only.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
+    limits:
+      memory: 100Mi
+
+backend:
+  image:
+    repository: nexus.atmos.lan:5000/atmos-backend
+    tag: 1.0.82-8d3c3cb
+  port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+    limits:
+      memory: 300Mi
+
+# Secret created by hand (not in Git), keys: openweather-api-key, mongodb-password.
+secretName: atmos-secrets
+
+mongodb:
+  image: mongo:8.0.32
+  # Data on the disk of one node (local-path), so the pod is pinned to that node.
+  node: k8s-w1
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 600Mi
+    limits:
+      memory: 600Mi
+
+redis:
+  image: redis:8.0.6
+  # Cache only: no persistence, oldest keys are dropped at the memory limit of Redis.
+  maxmemory: 64mb
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
+    limits:
+      memory: 100Mi
+
+# Address of the application (HTTP, Traefik of k3s); the name is in /etc/hosts of the Mac.
+ingress:
+  host: atmos.lan
