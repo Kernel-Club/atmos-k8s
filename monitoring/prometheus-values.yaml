@@ -50,8 +50,39 @@ kube-state-metrics:
     limits:
       memory: 100Mi
 
+# Alertmanager: one small replica, sends the alerts to Telegram.
+# No volume: after a restart silences are lost and an open alert may be sent once more.
 alertmanager:
-  enabled: false
+  enabled: true
+  persistence:
+    enabled: false
+  nodeSelector:
+    kubernetes.io/hostname: k8s-w1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 64Mi
+  # Bot token: Secret created by hand from Ansible Vault (see the README).
+  extraSecretMounts:
+    - name: telegram
+      secretName: alertmanager-telegram
+      mountPath: /etc/alertmanager/telegram
+      readOnly: true
+  config:
+    route:
+      receiver: telegram
+      group_by: [alertname, server]   # one message per problem and server
+      group_wait: 30s                 # wait for related alerts before the first message
+      group_interval: 5m              # new alerts of an open group at most every 5 minutes
+      repeat_interval: 4h             # reminder while the problem lasts
+    receivers:
+      - name: telegram
+        telegram_configs:
+          - bot_token_file: /etc/alertmanager/telegram/token
+            chat_id: 705885543        # private chat with the bot @atmos_alerts_bot (not a secret)
+            send_resolved: true       # message when the problem is gone
 prometheus-pushgateway:
   enabled: false
 prometheus-node-exporter:
@@ -114,3 +145,60 @@ extraScrapeConfigs: |
     static_configs:
       - targets: ["nexus.atmos.lan"]
         labels: {server: nexus-traefik}
+
+# Alert rules. Every alert has the label server (or the labels of the object), so Alertmanager groups by it.
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: atmos
+        rules:
+          - alert: TargetDown
+            expr: up == 0
+            for: 5m
+            labels: {severity: critical}
+            annotations:
+              summary: "{{ $labels.job }} on {{ $labels.server }} ({{ $labels.instance }}) does not answer Prometheus"
+
+          - alert: DiskFreeLow
+            expr: |
+              node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes < 0.15
+              or windows_logical_disk_free_bytes{volume=~"[A-Z]:"} / windows_logical_disk_size_bytes < 0.15
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.server }}: less than 15 % free on {{ $labels.mountpoint }}{{ $labels.volume }} ({{ $value | humanizePercentage }})"
+
+          # Servers only: the host PC is near its memory limit by design (the VMs take most of it).
+          - alert: MemoryHigh
+            expr: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes > 0.9
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.server }}: memory used above 90 % for 10 minutes ({{ $value | humanizePercentage }})"
+
+          - alert: NodeNotReady
+            expr: kube_node_status_condition{condition="Ready", status="true"} == 0
+            for: 5m
+            labels: {severity: critical}
+            annotations:
+              summary: "Cluster node {{ $labels.node }} is not Ready"
+
+          - alert: PodRestartingLoop
+            expr: increase(kube_pod_container_status_restarts_total[15m]) > 2
+            labels: {severity: warning}
+            annotations:
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) restarted {{ $value | humanize }} times in 15 minutes"
+
+          # Server certificate of the platform, as served by Traefik on nexus-traefik.
+          - alert: CertificateExpiringSoon
+            expr: (traefik_tls_certs_not_after{job="traefik"} - time()) / 86400 < 30
+            labels: {severity: warning}
+            annotations:
+              summary: "Certificate {{ $labels.cn }} expires in {{ $value | humanize }} days: renew it with Ansible (README of atmos-ansible)"
+
+          # Result of the last build of each job: 0 success, 1 unstable, 2 failure. Resolved by the next good build.
+          - alert: JenkinsBuildFailed
+            expr: default_jenkins_builds_last_build_result_ordinal == 2
+            labels: {severity: warning}
+            annotations:
+              summary: "Jenkins job {{ $labels.jenkins_job }}: the last build failed"
