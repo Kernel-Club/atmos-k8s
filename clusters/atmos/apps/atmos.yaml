@@ -1,0 +1,21 @@
+# The application: the chart charts/atmos of this repository, installed and upgraded by Flux.
+# It takes over the release "atmos" that was installed by hand in US-05 (same name and namespace).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: atmos
+  namespace: atmos
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: ./charts/atmos
+      sourceRef:
+        kind: GitRepository
+        name: flux-system
+        namespace: flux-system
+      reconcileStrategy: Revision   # a new commit is a new chart, without raising version in Chart.yaml
+  upgrade:
+    remediation:
+      retries: 2                    # a failed upgrade is retried, then rolled back to the last good release
+  values: {}                        # image tags come here with image automation
