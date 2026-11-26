@@ -1,0 +1,59 @@
+# Image automation, part 1: Flux reads the tags of the application images in Nexus and picks the newest.
+# Tags from Jenkins: <MAJOR.MINOR>.<commits>-<short sha>, for example 1.0.82-8d3c3cb.
+# Secrets created by hand (README): nexus-pull (read-only user cluster-pull) and nexus-ca (platform CA).
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: atmos-backend
+  namespace: flux-system
+spec:
+  image: nexus.atmos.lan:5000/atmos-backend
+  interval: 1m
+  secretRef:
+    name: nexus-pull
+  certSecretRef:
+    name: nexus-ca
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: atmos-frontend
+  namespace: flux-system
+spec:
+  image: nexus.atmos.lan:5000/atmos-frontend
+  interval: 1m
+  secretRef:
+    name: nexus-pull
+  certSecretRef:
+    name: nexus-ca
+---
+# The newest version by semver of <MAJOR.MINOR>.<commits>; the short sha only makes the tag unique.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: atmos-backend
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: atmos-backend
+  filterTags:
+    pattern: '^(?P<version>\d+\.\d+\.\d+)-[a-f0-9]+$'
+    extract: '$version'
+  policy:
+    semver:
+      range: '>=1.0.0'
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: atmos-frontend
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: atmos-frontend
+  filterTags:
+    pattern: '^(?P<version>\d+\.\d+\.\d+)-[a-f0-9]+$'
+    extract: '$version'
+  policy:
+    semver:
+      range: '>=1.0.0'
