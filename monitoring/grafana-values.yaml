@@ -70,3 +70,23 @@ dashboards:
       gnetId: 15760
       revision: 41
       datasource: Prometheus
+    host-pc:            # Windows Exporter Dashboard 2025 (windows_exporter 0.31+)
+      gnetId: 24390
+      revision: 4
+      datasource: [{name: DS_PROMETHEUS_MSP, value: Prometheus}]   # the dashboard names its data source input DS_PROMETHEUS_MSP
+    docker:             # Docker daemon metrics (metrics-addr of dockerd)
+      gnetId: 21040
+      revision: 1
+      datasource: Prometheus
+    traefik:            # Traefik Official Standalone Dashboard
+      gnetId: 17346
+      revision: 9
+      datasource: Prometheus
+    jenkins:            # Jenkins: Performance and Health Overview (Prometheus plugin)
+      gnetId: 9964
+      revision: 1
+      datasource: Prometheus
+    nexus:              # Infra / Nexus (/service/metrics/prometheus)
+      gnetId: 16459
+      revision: 1
+      datasource: [{name: DS_PROMETHEUS-DEV, value: Prometheus}]   # the dashboard names its data source input DS_PROMETHEUS-DEV

@@ -63,7 +63,8 @@ helm upgrade --install grafana grafana-community/grafana --version 14.6.0 -n mon
 - Prometheus keeps 3 days on a 5Gi volume on `k8s-w1`. Targets outside the cluster (label `server`): node-exporter on the four servers, windows_exporter on the host PC, Docker Engine on `jenkins` and `nexus-traefik`, Traefik, and Jenkins and Nexus through Traefik over HTTPS.
 - The CA of the platform (public certificate) is the ConfigMap `atmos-ca`, created before the install: `kubectl create configmap atmos-ca -n monitoring --from-file=ca.crt=$HOME/.atmos/pki/ca.crt`.
 - The password of the read-only Nexus user `prometheus-metrics` is the Secret `nexus-metrics` (key `password`), created from Ansible Vault in `atmos-ansible`: `kubectl create secret generic nexus-metrics -n monitoring --from-literal=password=(ansible localhost -m debug -a 'msg={{ vault_nexus_metrics_password }}' | grep msg | cut -d'"' -f4)`.
-- Grafana has no volume: the data source and the dashboards (folder Atmos: servers, cluster, nodes, pods) are provisioned from the values.
+- Grafana has no volume: the data source and the dashboards (folder Atmos: servers, cluster, nodes, pods, host PC, Docker, Traefik, Jenkins, Nexus) are provisioned from the values.
+- The dashboards come from grafana.com and are older than some of our versions, so a few panels stay empty: Nexus JVM pools and Jetty (Nexus 3.98 uses G1 and other metric names), Jenkins uptime, CPU frequency of the host PC. The host PC CPU works through a rename rule in `monitoring/prometheus-values.yaml` (windows_exporter 0.32 renamed the metric).
 - Grafana admin password: Secret `grafana-admin` (keys `admin-user`, `admin-password`), created before the install:
 
 ```bash
