@@ -3,3 +3,16 @@ kind: Kustomization
 resources:
 - gotk-components.yaml
 - gotk-sync.yaml
+# Git access through the GitHub App atmos-flux (installed only on atmos-k8s) instead of the bootstrap token.
+# A patch here, because flux bootstrap overwrites gotk-sync.yaml.
+patches:
+- target:
+    kind: GitRepository
+    name: flux-system
+  patch: |
+    - op: add
+      path: /spec/provider
+      value: github
+    - op: replace
+      path: /spec/secretRef/name
+      value: flux-github-app
