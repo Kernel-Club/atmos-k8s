@@ -1,0 +1,109 @@
+# Grafana (chart grafana-community/grafana 14.6.0, Grafana 13.3.2).
+# Everything is provisioned from the values, so Grafana needs no volume: a new pod comes up configured.
+# Secrets created by hand (README): see the comments in the values.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: grafana
+      version: "14.6.0"          # pinned chart version
+      sourceRef:
+        kind: HelmRepository
+        name: grafana-community
+  upgrade:
+    remediation:
+      retries: 2
+  values:
+    admin:
+      existingSecret: grafana-admin
+      userKey: admin-user
+      passwordKey: admin-password
+
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      hosts: [grafana.atmos.lan]
+
+    # Memory request = limit; CPU request only. 250Mi was killed (OOM) at the first start of Grafana 13; 400Mi reached 382Mi.
+    resources:
+      requests:
+        cpu: 50m
+        memory: 512Mi
+      limits:
+        memory: 512Mi
+
+    # Planned in the RAM of k8s-w1; k8s-cp keeps its memory for Flux.
+    nodeSelector:
+      kubernetes.io/hostname: k8s-w1
+
+    # No plugins installed at start (Drilldown apps etc.): not used, they cost memory and CPU.
+    grafana.ini:
+      plugins:
+        preinstall_disabled: true
+
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            url: http://prometheus-server.monitoring.svc
+            isDefault: true
+            jsonData:
+              # Scrape interval of Prometheus (chart default 1m): rate() panels need at least two samples in their window.
+              timeInterval: 1m
+
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: default
+            folder: Atmos
+            type: file
+            options:
+              path: /var/lib/grafana/dashboards/default
+
+    # Community dashboards from grafana.com, downloaded at start; revision pinned (without it the chart takes revision 1).
+    dashboards:
+      default:
+        servers:            # Node Exporter Full: CPU, memory, disk, network of the four servers
+          gnetId: 1860
+          revision: 46
+          datasource: Prometheus
+        cluster:            # Kubernetes / Views / Global
+          gnetId: 15757
+          revision: 43
+          datasource: Prometheus
+        nodes:              # Kubernetes / Views / Nodes
+          gnetId: 15759
+          revision: 40
+          datasource: Prometheus
+        pods:               # Kubernetes / Views / Pods (application pods in the namespace atmos)
+          gnetId: 15760
+          revision: 41
+          datasource: Prometheus
+        host-pc:            # Windows Exporter Dashboard 2025 (windows_exporter 0.31+)
+          gnetId: 24390
+          revision: 4
+          datasource: [{name: DS_PROMETHEUS_MSP, value: Prometheus}]   # the dashboard names its data source input DS_PROMETHEUS_MSP
+        docker:             # Docker daemon metrics (metrics-addr of dockerd)
+          gnetId: 21040
+          revision: 1
+          datasource: Prometheus
+        traefik:            # Traefik Official Standalone Dashboard
+          gnetId: 17346
+          revision: 9
+          datasource: Prometheus
+        jenkins:            # Jenkins: Performance and Health Overview (Prometheus plugin)
+          gnetId: 9964
+          revision: 1
+          datasource: Prometheus
+        nexus:              # Infra / Nexus (/service/metrics/prometheus)
+          gnetId: 16459
+          revision: 1
+          datasource: [{name: DS_PROMETHEUS-DEV, value: Prometheus}]   # the dashboard names its data source input DS_PROMETHEUS-DEV

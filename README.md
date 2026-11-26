@@ -14,9 +14,12 @@ Nexus (nexus-traefik) ─► Flux: new tag ─► commit to main ─► Helm upg
 
 | Path | What it does |
 |---|---|
-| `flux-system/` | Flux configuration, HelmRelease of the application, image automation |
+| `clusters/atmos/flux-system/` | Flux itself (written by `flux bootstrap`); Git access through the GitHub App (patch in `kustomization.yaml`) |
+| `clusters/atmos/apps/` | HelmRelease of the application (chart `charts/atmos/`) |
+| `clusters/atmos/monitoring/` | HelmReleases of Prometheus (with kube-state-metrics and Alertmanager) and Grafana, with their values (namespace `monitoring`) |
 | `charts/atmos/` | Helm chart: frontend, backend, MongoDB, Redis, Ingress, NetworkPolicy, memory limits |
-| `monitoring/` | Prometheus, Grafana, kube-state-metrics (namespace `monitoring`) |
+
+Flux applies everything under `clusters/atmos/`; the chart and the values are not applied directly.
 
 | Address | Service |
 |---|---|
@@ -44,30 +47,23 @@ flux resume image update --all -n flux-system    # after the fix is built
 
 **Logs:** `kubectl logs -n atmos deploy/backend` (add `--previous` after a restart). There is no central log storage.
 
-## Monitoring and alerts (before Flux)
+## Monitoring and alerts
 
-Installed by hand with Helm from the values in `monitoring/`; versions pinned here:
+Installed and upgraded by Flux from `clusters/atmos/monitoring/`; chart versions pinned there:
 
 | Release | Chart | Version |
 |---|---|---|
 | `prometheus` (with kube-state-metrics) | `prometheus-community/prometheus` | 30.0.1 (Prometheus v3.16.0) |
 | `grafana` | `grafana-community/grafana` | 14.6.0 (Grafana 13.3.2) |
 
-```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo add grafana-community https://grafana-community.github.io/helm-charts
-helm upgrade --install prometheus prometheus-community/prometheus --version 30.0.1 -n monitoring --create-namespace -f monitoring/prometheus-values.yaml
-helm upgrade --install grafana grafana-community/grafana --version 14.6.0 -n monitoring -f monitoring/grafana-values.yaml
-```
-
 - Prometheus keeps 3 days on a 5Gi volume on `k8s-w1`. Targets outside the cluster (label `server`): node-exporter on the four servers, windows_exporter on the host PC, Docker Engine on `jenkins` and `nexus-traefik`, Traefik, and Jenkins and Nexus through Traefik over HTTPS.
-- The CA of the platform (public certificate) is the ConfigMap `atmos-ca`, created before the install: `kubectl create configmap atmos-ca -n monitoring --from-file=ca.crt=$HOME/.atmos/pki/ca.crt`.
+- The CA of the platform (public certificate) is the ConfigMap `atmos-ca`, created before Flux installs monitoring: `kubectl create configmap atmos-ca -n monitoring --from-file=ca.crt=$HOME/.atmos/pki/ca.crt`.
 - The password of the read-only Nexus user `prometheus-metrics` is the Secret `nexus-metrics` (key `password`), created from Ansible Vault in `atmos-ansible`: `kubectl create secret generic nexus-metrics -n monitoring --from-literal=password=(ansible localhost -m debug -a 'msg={{ vault_nexus_metrics_password }}' | grep msg | cut -d'"' -f4)`.
 - Grafana has no volume: the data source and the dashboards (folder Atmos: servers, cluster, nodes, pods, host PC, Docker, Traefik, Jenkins, Nexus) are provisioned from the values.
-- Alertmanager (part of the `prometheus` release) sends the alerts to the Telegram bot `@atmos_alerts_bot`; the rules are in `monitoring/prometheus-values.yaml`. The bot token is the Secret `alertmanager-telegram` (key `token`), created from Ansible Vault in `atmos-ansible`: `kubectl create secret generic alertmanager-telegram -n monitoring --from-literal=token=(ansible localhost -m debug -a 'msg={{ vault_telegram_bot_token }}' | grep msg | cut -d'"' -f4)`.
+- Alertmanager (part of the `prometheus` release) sends the alerts to the Telegram bot `@atmos_alerts_bot`; the rules are in `clusters/atmos/monitoring/prometheus.yaml`. The bot token is the Secret `alertmanager-telegram` (key `token`), created from Ansible Vault in `atmos-ansible`: `kubectl create secret generic alertmanager-telegram -n monitoring --from-literal=token=(ansible localhost -m debug -a 'msg={{ vault_telegram_bot_token }}' | grep msg | cut -d'"' -f4)`.
 - Test the Telegram channel after a change: `kubectl port-forward -n monitoring svc/prometheus-alertmanager 9093:9093`, then `curl -X POST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{"labels":{"alertname":"TestAlert","server":"mac"}}]'`; FIRING arrives in about 30 seconds, RESOLVED after 5 minutes.
-- The dashboards come from grafana.com and are older than some of our versions, so a few panels stay empty: Nexus JVM pools and Jetty (Nexus 3.98 uses G1 and other metric names), Jenkins uptime, CPU frequency of the host PC. The host PC CPU works through a rename rule in `monitoring/prometheus-values.yaml` (windows_exporter 0.32 renamed the metric).
-- Grafana admin password: Secret `grafana-admin` (keys `admin-user`, `admin-password`), created before the install:
+- The dashboards come from grafana.com and are older than some of our versions, so a few panels stay empty: Nexus JVM pools and Jetty (Nexus 3.98 uses G1 and other metric names), Jenkins uptime, CPU frequency of the host PC. The host PC CPU works through a rename rule in `clusters/atmos/monitoring/prometheus.yaml` (windows_exporter 0.32 renamed the metric).
+- Grafana admin password: Secret `grafana-admin` (keys `admin-user`, `admin-password`), created before Flux installs monitoring:
 
 ```bash
 kubectl create secret generic grafana-admin -n monitoring --from-literal=admin-user=admin --from-literal=admin-password=(openssl rand -base64 24)
@@ -86,13 +82,6 @@ set -e key
 ```
 
 The MongoDB password is set only when the volume is created: changing it in the Secret later does not change it in MongoDB.
-
-## Manual install (before Flux)
-
-```bash
-helm lint charts/atmos
-helm upgrade --install atmos charts/atmos -n atmos --create-namespace
-```
 
 ## Related
 
