@@ -1,0 +1,27 @@
+# Image automation, part 2: Flux writes the newest tags into the HelmRelease and commits them to main.
+# It pushes through the GitHub App atmos-flux (the only write access to this repository).
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: atmos
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: atmos-flux
+        email: atmos-flux@users.noreply.github.com
+      messageTemplate: |
+        Deploy {{ range .Changed.Changes }}{{ .NewValue }} {{ end }}
+    push:
+      branch: main
+  update:
+    path: ./clusters/atmos/apps
+    strategy: Setters
