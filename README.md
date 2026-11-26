@@ -44,7 +44,7 @@ flux resume image update --all -n flux-system    # after the fix is built
 
 **Logs:** `kubectl logs -n atmos deploy/backend` (add `--previous` after a restart). There is no central log storage.
 
-## Monitoring (before Flux)
+## Monitoring and alerts (before Flux)
 
 Installed by hand with Helm from the values in `monitoring/`; versions pinned here:
 
@@ -64,6 +64,8 @@ helm upgrade --install grafana grafana-community/grafana --version 14.6.0 -n mon
 - The CA of the platform (public certificate) is the ConfigMap `atmos-ca`, created before the install: `kubectl create configmap atmos-ca -n monitoring --from-file=ca.crt=$HOME/.atmos/pki/ca.crt`.
 - The password of the read-only Nexus user `prometheus-metrics` is the Secret `nexus-metrics` (key `password`), created from Ansible Vault in `atmos-ansible`: `kubectl create secret generic nexus-metrics -n monitoring --from-literal=password=(ansible localhost -m debug -a 'msg={{ vault_nexus_metrics_password }}' | grep msg | cut -d'"' -f4)`.
 - Grafana has no volume: the data source and the dashboards (folder Atmos: servers, cluster, nodes, pods, host PC, Docker, Traefik, Jenkins, Nexus) are provisioned from the values.
+- Alertmanager (part of the `prometheus` release) sends the alerts to the Telegram bot `@atmos_alerts_bot`; the rules are in `monitoring/prometheus-values.yaml`. The bot token is the Secret `alertmanager-telegram` (key `token`), created from Ansible Vault in `atmos-ansible`: `kubectl create secret generic alertmanager-telegram -n monitoring --from-literal=token=(ansible localhost -m debug -a 'msg={{ vault_telegram_bot_token }}' | grep msg | cut -d'"' -f4)`.
+- Test the Telegram channel after a change: `kubectl port-forward -n monitoring svc/prometheus-alertmanager 9093:9093`, then `curl -X POST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{"labels":{"alertname":"TestAlert","server":"mac"}}]'`; FIRING arrives in about 30 seconds, RESOLVED after 5 minutes.
 - The dashboards come from grafana.com and are older than some of our versions, so a few panels stay empty: Nexus JVM pools and Jetty (Nexus 3.98 uses G1 and other metric names), Jenkins uptime, CPU frequency of the host PC. The host PC CPU works through a rename rule in `monitoring/prometheus-values.yaml` (windows_exporter 0.32 renamed the metric).
 - Grafana admin password: Secret `grafana-admin` (keys `admin-user`, `admin-password`), created before the install:
 
