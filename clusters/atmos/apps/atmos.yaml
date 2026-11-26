@@ -14,15 +14,15 @@ spec:
         kind: GitRepository
         name: flux-system
         namespace: flux-system
-      reconcileStrategy: Revision   # a new commit is a new chart, without raising version in Chart.yaml
+      reconcileStrategy: Revision # a new commit is a new chart, without raising version in Chart.yaml
   upgrade:
     remediation:
-      retries: 2                    # a failed upgrade is retried, then rolled back to the last good release
+      retries: 2 # a failed upgrade is retried, then rolled back to the last good release
   # Image tags, updated by Flux (ImageUpdateAutomation): the comment is the marker of the image policy.
   values:
     frontend:
       image:
-        tag: 1.0.82-8d3c3cb # {"$imagepolicy": "flux-system:atmos-frontend:tag"}
+        tag: 1.0.95-d3d686b # {"$imagepolicy": "flux-system:atmos-frontend:tag"}
     backend:
       image:
-        tag: 1.0.82-8d3c3cb # {"$imagepolicy": "flux-system:atmos-backend:tag"}
+        tag: 1.0.95-d3d686b # {"$imagepolicy": "flux-system:atmos-backend:tag"}
