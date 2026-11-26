@@ -26,6 +26,3 @@ spec:
     backend:
       image:
         tag: 1.0.97-7ef5013 # {"$imagepolicy": "flux-system:atmos-backend:tag"}
-      resources:
-        limits:
-          memory: 300Mo   # BROKEN ON PURPOSE: "Mo" is not a unit, test of a failed release
