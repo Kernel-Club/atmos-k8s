@@ -29,19 +29,22 @@ Flux applies everything under `clusters/atmos/`; the chart and the values are no
 ## Delivery
 
 1. Jenkins pushes a new image to Nexus (`<MAJOR.MINOR>.<commits>-<short-sha>`, for example `1.0.82-8d3c3cb`).
-2. Flux selects the highest version and commits the tag to `spec.values` of the HelmRelease in `main`.
-3. Flux upgrades the Helm release and the pods are replaced.
+2. Flux scans Nexus every minute (`ImageRepository`), selects the highest `MAJOR.MINOR.<commits>` (`ImagePolicy`, semver) and commits the tag to the marked lines in `spec.values` of the HelmRelease in `main` (`ImageUpdateAutomation`, commit `Deploy <tag>`).
+3. Flux upgrades the Helm release; the pods are replaced one by one (rolling update). A failed upgrade is retried twice and rolled back to the last good release.
+
+From a merge in `develop` to new pods: about 5 minutes (Jenkins polls Git every 5 minutes).
 
 ```bash
-flux get helmreleases -A      # deployed version and failures
-flux get images all -A        # scanned tags and selected image
+flux get helmreleases -A      # deployed version and failures (READY False with the reason)
+flux get images all -A        # scanned tags, selected image, last automation run
+helm history atmos -n atmos   # upgrades and rollbacks
 ```
 
 **Rollback:**
 
 ```bash
 flux suspend image update --all -n flux-system   # stop Flux from selecting the newest image again
-git revert <tag-commit> && git push              # restore the previous version
+git revert <Deploy commit>, Pull Request, merge  # restore the previous version
 flux resume image update --all -n flux-system    # after the fix is built
 ```
 
@@ -71,7 +74,7 @@ kubectl create secret generic grafana-admin -n monitoring --from-literal=admin-u
 
 ## Secrets
 
-Not stored in Git. Created by hand with `kubectl create secret`: OpenWeather key, MongoDB password, Grafana admin password, Nexus pull credentials and CA for Flux.
+Not stored in Git. Created by hand with `kubectl create secret`, before Flux installs what needs them; the platform ones come from Ansible Vault in `atmos-ansible` (run these commands in that folder).
 
 The application reads the Secret `atmos-secrets` (keys `openweather-api-key`, `mongodb-password`). Create it once, before the first install (fish; the key is typed hidden, the password is generated):
 
@@ -82,6 +85,34 @@ set -e key
 ```
 
 The MongoDB password is set only when the volume is created: changing it in the Secret later does not change it in MongoDB.
+
+Secrets of Flux (namespace `flux-system`):
+
+```bash
+# Git access: GitHub App atmos-flux (App ID 5934648, installation 186078775)
+ansible localhost -m ansible.builtin.copy -a "content={{ vault_flux_github_app_private_key }} dest=/tmp/flux-app.pem mode=0600" > /dev/null
+kubectl create secret generic flux-github-app -n flux-system --from-literal=githubAppID=5934648 --from-literal=githubAppInstallationID=186078775 --from-file=githubAppPrivateKey=/tmp/flux-app.pem
+rm /tmp/flux-app.pem
+# Nexus scan: read-only user and the platform CA
+kubectl create secret docker-registry nexus-pull -n flux-system --docker-server=nexus.atmos.lan:5000 --docker-username=cluster-pull --docker-password=(ansible localhost -m debug -a 'msg={{ vault_nexus_pull_password }}' | grep msg | cut -d'"' -f4)
+kubectl create secret generic nexus-ca -n flux-system --from-file=ca.crt=$HOME/.atmos/pki/ca.crt
+```
+
+## Install Flux on a new cluster
+
+The patch in `clusters/atmos/flux-system/kustomization.yaml` already points Git access to the GitHub App, so its Secret must exist before the bootstrap.
+
+1. `kubectl create namespace flux-system`, then create the Secrets of Flux above (and the Secrets of `atmos` and `monitoring`).
+2. Create a fine-grained token for Kernel-Club, only `atmos-k8s`, Administration and Contents read and write, 7 days; copy it.
+3. Bootstrap (the image automation controllers are extra components):
+
+```bash
+set -x GITHUB_TOKEN (pbpaste)
+flux bootstrap github --token-auth --owner=Kernel-Club --repository=atmos-k8s --branch=main --path=clusters/atmos --components-extra=image-reflector-controller,image-automation-controller
+set -e GITHUB_TOKEN
+```
+
+4. Delete the token on GitHub and the Secret with it: `kubectl delete secret flux-system -n flux-system`.
 
 ## Related
 
