@@ -18,6 +18,16 @@ spec:
         app.kubernetes.io/name: mongodb
         app.kubernetes.io/part-of: atmos
     spec:
+      # UID 999 is the mongodb user of the official image.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        # Files on the data volume belong to this group; checked only when the volume root does not match.
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.mongodb.node }}
       containers:
@@ -37,6 +47,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data/db
+            - name: tmp
+              mountPath: /tmp
+            - name: configdb
+              mountPath: /data/configdb
           readinessProbe:
             tcpSocket:
               port: mongodb
@@ -45,6 +59,19 @@ spec:
               port: mongodb
           resources:
             {{- toYaml .Values.mongodb.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+      # Writable folders on a read-only root filesystem.
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: configdb
+          emptyDir:
+            sizeLimit: 16Mi
   volumeClaimTemplates:
     - metadata:
         name: data
