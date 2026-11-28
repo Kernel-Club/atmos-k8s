@@ -1,0 +1,40 @@
+# Trivy findings in the Helm chart that are accepted on purpose (US-07).
+# Paths are relative to charts/atmos. After expired_at the finding is reported again:
+# review the decision, then extend the date or fix the finding.
+misconfigurations:
+  - id: KSV-0011
+    statement: >-
+      No CPU limit on purpose: a limit throttles the pods on small VMs.
+      CPU requests are set, memory request = limit.
+    expired_at: 2027-05-28
+
+  - id: KSV-0020
+    paths:
+      - templates/mongodb.yaml
+      - templates/redis.yaml
+    statement: >-
+      UID 999 is the user of the official mongo and redis images; files in the images belong to it.
+      The pods run as non-root with a read-only filesystem and no capabilities.
+    expired_at: 2027-05-28
+
+  - id: KSV-0021
+    paths:
+      - templates/mongodb.yaml
+      - templates/redis.yaml
+    statement: >-
+      GID 999 is the group of the official mongo and redis images (see KSV-0020).
+    expired_at: 2027-05-28
+
+  - id: KSV-0110
+    statement: >-
+      The chart sets no namespace; the HelmRelease installs it into the atmos namespace.
+    expired_at: 2027-05-28
+
+  - id: KSV-0125
+    paths:
+      - templates/mongodb.yaml
+      - templates/redis.yaml
+    statement: >-
+      Official mongo and redis images from Docker Hub, pinned to an exact version.
+      Our own images come from Nexus.
+    expired_at: 2027-05-28
