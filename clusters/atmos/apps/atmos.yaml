@@ -25,4 +25,4 @@ spec:
         tag: 1.0.112-83ba99b # {"$imagepolicy": "flux-system:atmos-frontend:tag"}
     backend:
       image:
-        tag: 1.0.112-83ba99b # {"$imagepolicy": "flux-system:atmos-backend:tag"}
+        tag: 1.0.114-c8a55f5 # {"$imagepolicy": "flux-system:atmos-backend:tag"}
