@@ -5,6 +5,9 @@ metadata:
   name: atmos
   labels:
     app.kubernetes.io/part-of: atmos
+  annotations:
+    # Security headers (security-headers.yaml): Middleware <namespace>-<name> of the Traefik CRDs.
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-security-headers@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
