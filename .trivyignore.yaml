@@ -32,9 +32,12 @@ misconfigurations:
 
   - id: KSV-0125
     paths:
+      - templates/backend.yaml
+      - templates/frontend.yaml
       - templates/mongodb.yaml
       - templates/redis.yaml
     statement: >-
-      Official mongo and redis images from Docker Hub, pinned to an exact version.
-      Our own images come from Nexus.
+      The check does not know our registries. backend and frontend come from our Nexus
+      (built and scanned by Jenkins); mongo and redis are official Docker Hub images pinned
+      to an exact version. A new workload file is not covered and is reported.
     expired_at: 2027-05-28
