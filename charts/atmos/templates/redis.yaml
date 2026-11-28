@@ -17,6 +17,13 @@ spec:
         app.kubernetes.io/name: redis
         app.kubernetes.io/part-of: atmos
     spec:
+      # UID 999 is the redis user of the official image.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: redis
           image: {{ .Values.redis.image }}
@@ -40,6 +47,19 @@ spec:
               port: redis
           resources:
             {{- toYaml .Values.redis.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      # Writable folders on a read-only root filesystem.
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: 16Mi
 ---
 apiVersion: v1
 kind: Service

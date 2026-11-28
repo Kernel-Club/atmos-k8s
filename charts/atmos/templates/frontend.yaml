@@ -17,6 +17,13 @@ spec:
         app.kubernetes.io/name: frontend
         app.kubernetes.io/part-of: atmos
     spec:
+      # Same UID as USER in the Dockerfile of atmos-dev; the group is set here, Kubernetes does not take it from the image.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
@@ -33,6 +40,19 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      # Writable folders on a read-only root filesystem.
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
 ---
 apiVersion: v1
 kind: Service
