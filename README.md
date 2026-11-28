@@ -96,6 +96,8 @@ rm /tmp/flux-app.pem
 # Nexus scan: read-only user and the platform CA
 kubectl create secret docker-registry nexus-pull -n flux-system --docker-server=nexus.atmos.lan:5000 --docker-username=cluster-pull --docker-password=(ansible localhost -m debug -a 'msg={{ vault_nexus_pull_password }}' | grep msg | cut -d'"' -f4)
 kubectl create secret generic nexus-ca -n flux-system --from-file=ca.crt=$HOME/.atmos/pki/ca.crt
+# Webhook of Jenkins that starts atmos-verify after a deploy (clusters/atmos/apps/verify.yaml)
+kubectl create secret generic verify-webhook -n flux-system --from-literal=address="https://jenkins.atmos.lan/generic-webhook-trigger/invoke?token="(ansible localhost -m debug -a 'msg={{ vault_verify_webhook_token }}' | grep msg | cut -d'"' -f4)
 ```
 
 ## Install Flux on a new cluster
