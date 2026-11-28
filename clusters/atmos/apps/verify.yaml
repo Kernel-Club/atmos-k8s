@@ -1,0 +1,32 @@
+# Verification after a deploy: when Flux has upgraded the HelmRelease atmos (Helm waits until the new
+# pods are ready), it calls the webhook of Jenkins, which starts the job develop-cd-checks (smoke, Playwright, ZAP).
+# Secrets created by hand (README): verify-webhook (key address: webhook URL with the token from
+# Ansible Vault) and nexus-ca (platform CA, also used by the image automation).
+apiVersion: notification.toolkit.fluxcd.io/v1
+kind: Provider
+metadata:
+  name: jenkins-verify
+  namespace: flux-system
+spec:
+  type: generic
+  secretRef:
+    name: verify-webhook
+  certSecretRef:
+    name: nexus-ca
+---
+apiVersion: notification.toolkit.fluxcd.io/v1
+kind: Alert
+metadata:
+  name: atmos-deployed
+  namespace: flux-system
+spec:
+  providerRef:
+    name: jenkins-verify
+  eventSeverity: info
+  eventSources:
+    - kind: HelmRelease
+      name: atmos
+      namespace: atmos
+  # Only a successful upgrade: a failed one is retried and rolled back by Flux, nothing to verify.
+  inclusionList:
+    - "(?i).*upgrade succeeded.*"
