@@ -22,7 +22,7 @@ spec:
   values:
     frontend:
       image:
-        tag: 1.0.122-39469a0 # {"$imagepolicy": "flux-system:atmos-frontend:tag"}
+        tag: 1.0.124-bcd9d69 # {"$imagepolicy": "flux-system:atmos-frontend:tag"}
     backend:
       image:
         tag: 1.0.124-bcd9d69 # {"$imagepolicy": "flux-system:atmos-backend:tag"}
