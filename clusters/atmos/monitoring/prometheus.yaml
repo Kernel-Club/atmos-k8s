@@ -101,6 +101,18 @@ spec:
               - bot_token_file: /etc/alertmanager/telegram/token
                 chat_id: 705885543        # private chat with the bot @atmos_alerts_bot (not a secret)
                 send_resolved: true       # message when the problem is gone
+                # Short message instead of the default one (all labels and an internal link):
+                # status and alert, server and severity, one line per problem, the time in UTC.
+                # A line marked (resolved) is a problem of the group that is already gone.
+                parse_mode: HTML
+                message: |-
+                  {{- if eq .Status "firing" }}<b>FIRING: {{ .CommonLabels.alertname }}</b>{{ else }}<b>RESOLVED: {{ .CommonLabels.alertname }}</b>{{ end }}
+                  Server: {{ .CommonLabels.server }}{{ if .CommonLabels.severity }} | Severity: {{ .CommonLabels.severity }}{{ end }}
+                  {{ range .Alerts }}
+                  - {{ .Annotations.summary }}{{ if and (eq $.Status "firing") (eq .Status "resolved") }} (resolved){{ end }}
+                  {{- end }}
+
+                  {{ if eq .Status "firing" }}Since: {{ (index .Alerts.Firing 0).StartsAt.Format "2006-01-02 15:04" }} UTC{{ else }}Resolved: {{ (index .Alerts 0).EndsAt.Format "2006-01-02 15:04" }} UTC{{ end }}
     prometheus-pushgateway:
       enabled: false
     prometheus-node-exporter:
